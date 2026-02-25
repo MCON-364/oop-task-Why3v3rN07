@@ -11,14 +11,12 @@ public class TaskManager {
     // TODO: Students must refactor this using pattern-matching switch
     // Current implementation uses old-style instanceof checks
     public void run(Command command) {
-        if (command instanceof AddTaskCommand) {
-            command.execute();
-        } else if (command instanceof RemoveTaskCommand) {
-            command.execute();
-        } else if (command instanceof UpdateTaskCommand) {
-            command.execute();
-        } else {
-            throw new IllegalArgumentException("Unknown command type");
+
+        switch (command) {
+            case AddTaskCommand add -> add.execute();
+            case RemoveTaskCommand rem -> rem.execute();
+            case UpdateTaskCommand upd -> upd.execute();
+            case UpdateTaskStatusCommand sta -> sta.execute();
         }
     }
 }

@@ -26,8 +26,7 @@ class CommandTest {
 
         command.execute();
 
-        assertNotNull(registry.get("New task"), "Task should be in registry after AddTaskCommand");
-        assertEquals(task, registry.get("New task"), "Added task should match");
+        assertEquals(task, registry.get("New task").orElseThrow(()->new TaskNotFoundException("Task should be in registry after AddTaskCommand")), "Added task should match");
     }
 
     @Test
@@ -39,8 +38,22 @@ class CommandTest {
         new AddTaskCommand(registry, originalTask).execute();
         new AddTaskCommand(registry, replacementTask).execute();
 
-        assertEquals(Priority.HIGH, registry.get("Task").getPriority(),
+        assertEquals(Priority.HIGH, registry.get("Task").orElseThrow(()->new TaskNotFoundException("Task should still exist")).priority(),
                 "Replacement task should have new priority");
+    }
+
+    @Test
+    @DisplayName("AddTaskCommand on nameless task should throw InvalidTaskException")
+    void testAddTaskCommandNameless() {
+
+        // This should throw an InvalidTaskException
+        assertThrows(InvalidTaskException.class, () -> {
+            new AddTaskCommand(registry, new Task("", Priority.LOW));
+        });
+
+        // Task should not be created
+        assertTrue(registry.get("").isEmpty(),
+                "Nameless task should not be created by AddTaskCommand");
     }
 
     @Test
@@ -51,7 +64,7 @@ class CommandTest {
         Command command = new RemoveTaskCommand(registry, "To be removed");
         command.execute();
 
-        assertNull(registry.get("To be removed"), "Task should be removed from registry");
+        assertTrue(registry.get("To be removed").isEmpty(), "Task should be removed from registry");
     }
 
     @Test
@@ -71,9 +84,8 @@ class CommandTest {
         Command command = new UpdateTaskCommand(registry, "Update me", Priority.HIGH);
         command.execute();
 
-        Task updated = registry.get("Update me");
-        assertNotNull(updated, "Task should still exist after update");
-        assertEquals(Priority.HIGH, updated.getPriority(), "Priority should be updated to HIGH");
+        Task updated = registry.get("Update me").orElseThrow(()->new TaskNotFoundException("Task should still exist after update"));
+        assertEquals(Priority.HIGH, updated.priority(), "Priority should be updated to HIGH");
     }
 
     @Test
@@ -84,21 +96,21 @@ class CommandTest {
         Command command = new UpdateTaskCommand(registry, "Important task", Priority.LOW);
         command.execute();
 
-        Task updated = registry.get("Important task");
-        assertEquals("Important task", updated.getName(), "Task name should be preserved");
+        Task updated = registry.get("Important task").orElseThrow(()->new TaskNotFoundException("Task should still exist"));
+        assertEquals("Important task", updated.name(), "Task name should be preserved");
     }
 
     @Test
-    @DisplayName("UpdateTaskCommand on non-existent task should not throw (pre-refactor)")
+    @DisplayName("UpdateTaskCommand on non-existent task should throw TaskNotFoundException")
     void testUpdateTaskCommandNonExistent() {
         Command command = new UpdateTaskCommand(registry, "Non-existent", Priority.HIGH);
 
         // Pre-refactor: this should not throw, just print a warning
-        assertDoesNotThrow(command::execute,
-                "Updating non-existent task should not throw (before custom exception refactoring)");
+        //Post-refactor: this should throw a TaskNotFoundException
+        assertThrows(TaskNotFoundException.class, command::execute);
 
         // Task should not be created
-        assertNull(registry.get("Non-existent"),
+        assertTrue(registry.get("Non-existent").isEmpty(),
                 "Non-existent task should not be created by update");
     }
 
@@ -109,7 +121,7 @@ class CommandTest {
 
         new UpdateTaskCommand(registry, "Flexible", Priority.LOW).execute();
 
-        assertEquals(Priority.LOW, registry.get("Flexible").getPriority(),
+        assertEquals(Priority.LOW, registry.get("Flexible").orElseThrow(()->new TaskNotFoundException("Task should still exist")).priority(),
                 "Should allow decreasing priority");
     }
 
@@ -120,8 +132,23 @@ class CommandTest {
 
         new UpdateTaskCommand(registry, "Urgent", Priority.HIGH).execute();
 
-        assertEquals(Priority.HIGH, registry.get("Urgent").getPriority(),
+        assertEquals(Priority.HIGH, registry.get("Urgent").orElseThrow(()->new TaskNotFoundException("Task should still exist")).priority(),
                 "Should allow increasing priority");
+    }
+
+    @Test
+    @DisplayName("UpdateTaskStatusCommand should update existing task status")
+    void testUpdateTaskStatusCommand() {
+        registry.add(new Task("Update me", Priority.LOW));
+        assertEquals(Status.TODO, registry.get("Update me").get().status());
+
+        new UpdateTaskStatusCommand(registry, "Update me", Status.IN_PROGRESS).execute();
+        Task updated = registry.get("Update me").orElseThrow(()->new TaskNotFoundException("Task should still exist after update"));
+        assertEquals(Status.IN_PROGRESS, updated.status(), "Status should be updated to IN_PROGRESS");
+
+        new UpdateTaskStatusCommand(registry, "Update me", Status.DONE).execute();
+        Task updated2 = registry.get("Update me").orElseThrow(()->new TaskNotFoundException("Task should still exist after update"));
+        assertEquals(Status.DONE, updated2.status(), "Status should be updated to DONE");
     }
 }
 
