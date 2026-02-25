@@ -4,6 +4,8 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.DisplayName;
 
+import java.util.Optional;
+
 import static org.junit.jupiter.api.Assertions.*;
 
 /**
@@ -23,8 +25,7 @@ class TaskRegistryTest {
         Task task = new Task("Test task", Priority.HIGH);
         registry.add(task);
 
-        Task retrieved = registry.get("Test task");
-        assertNotNull(retrieved, "Added task should be retrievable");
+        Task retrieved = registry.get("Test task").orElseThrow(()->new TaskNotFoundException("Added task should be retrievable"));
         assertEquals(task, retrieved, "Retrieved task should equal added task");
     }
 
@@ -37,15 +38,15 @@ class TaskRegistryTest {
         registry.add(task1);
         registry.add(task2);
 
-        Task retrieved = registry.get("Test task");
-        assertEquals(Priority.HIGH, retrieved.getPriority(), "Second task should replace first");
+        Task retrieved = registry.get("Test task").orElseThrow(()->new TaskNotFoundException("Added task should exist"));
+        assertEquals(Priority.HIGH, retrieved.priority(), "Second task should replace first");
     }
 
     @Test
     @DisplayName("Getting non-existent task should return null")
     void testGetNonExistent() {
-        Task result = registry.get("Non-existent");
-        assertNull(result, "Non-existent task should return null (before Optional refactoring)");
+        Optional<Task> result = registry.get("Non-existent");
+        assertTrue(result.isEmpty(), "Non-existent task should return empty Optional");
     }
 
     @Test
@@ -56,7 +57,7 @@ class TaskRegistryTest {
 
         registry.remove("Test task");
 
-        assertNull(registry.get("Test task"), "Removed task should not be retrievable");
+        assertTrue(registry.get("Test task").isEmpty(), "Removed task should not be retrievable");
     }
 
     @Test
@@ -88,5 +89,22 @@ class TaskRegistryTest {
     void testGetAllEmpty() {
         assertTrue(registry.getAll().isEmpty(), "Empty registry should return empty map");
     }
+
+    @Test
+    @DisplayName("getTasksByPriority should group tasks by their priorities")
+    void testGetTasksByPriority() {
+        Task task1 = new Task("Task 1", Priority.HIGH);
+        Task task2 = new Task("Task 2", Priority.LOW);
+        Task task3 = new Task("Task 3", Priority.HIGH);
+
+        registry.add(task1);
+        registry.add(task2);
+        registry.add(task3);
+
+        assertEquals(2, registry.getTasksByPriority().get(Priority.HIGH).size(), "Should have 2 HIGH priority tasks");
+        assertEquals(1, registry.getTasksByPriority().get(Priority.LOW).size(), "Should have 1 LOW priority task");
+        assertNull(registry.getTasksByPriority().get(Priority.MEDIUM), "Should have no MEDIUM priority tasks");
+    }
+
 }
 
